@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>中日即時翻譯助手</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .active-pulse { animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col items-center p-4">
+    <header class="text-center my-8">
+        <h1 class="text-2xl font-bold text-gray-800">🇯🇵 中日即時翻譯 🇨🇳</h1>
+        <p class="text-gray-500">點擊按鈕後開始說話</p>
+    </header>
+
+    <div class="w-full max-w-md space-y-6">
+        <button id="btn-zh" class="w-full bg-blue-500 hover:bg-blue-600 text-white py-8 rounded-2xl shadow-lg flex flex-col items-center transition-all">
+            <span class="text-lg">我說中文 (翻日文)</span>
+            <span class="text-sm opacity-80 mt-2">点击说话</span>
+        </button>
+
+        <button id="btn-ja" class="w-full bg-red-500 hover:bg-red-600 text-white py-8 rounded-2xl shadow-lg flex flex-col items-center transition-all">
+            <span class="text-lg">對方說日文 (翻中文)</span>
+            <span class="text-sm opacity-80 mt-2">日本語で話す</span>
+        </button>
+
+        <div class="bg-white p-6 rounded-2xl shadow-inner min-h-[150px] border border-gray-200">
+            <p id="status" class="text-xs text-gray-400 mb-2 italic">等待操作...</p>
+            <div id="result-box">
+                <p id="original-text" class="text-gray-600 text-sm mb-2"></p>
+                <p id="translated-text" class="text-xl font-bold text-gray-900"></p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const btnZh = document.getElementById('btn-zh');
+        const btnJa = document.getElementById('btn-ja');
+        const status = document.getElementById('status');
+        const originalText = document.getElementById('original-text');
+        const translatedText = document.getElementById('translated-text');
+
+        const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+        recognition.interimResults = false;
+
+        async function translateAndSpeak(text, sourceLang, targetLang) {
+            status.innerText = "翻譯中...";
+            // 使用免費的 Google 翻譯 API 代理 (注意：此為示範用途)
+            const res = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=${sourceLang}&tl=${targetLang}&dt=t&q=${encodeURI(text)}`);
+            const data = await res.json();
+            const result = data[0][0][0];
+            
+            translatedText.innerText = result;
+            
+            // 語音播放
+            const utterance = new SpeechSynthesisUtterance(result);
+            utterance.lang = targetLang === 'ja' ? 'ja-JP' : 'zh-TW';
+            window.speechSynthesis.speak(utterance);
+            status.innerText = "完成";
+        }
+
+        function startListening(lang, source, target) {
+            recognition.lang = lang;
+            recognition.start();
+            status.innerText = "正在聆聽...";
+            
+            recognition.onresult = (event) => {
+                const text = event.results[0][0].transcript;
+                originalText.innerText = `辨識內容：${text}`;
+                translateAndSpeak(text, source, target);
+            };
+        }
+
+        btnZh.onclick = () => startListening('zh-TW', 'zh-TW', 'ja');
+        btnJa.onclick = () => startListening('ja-JP', 'ja', 'zh-TW');
+    </script>
+</body>
+</html>
