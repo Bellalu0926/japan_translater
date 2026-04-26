@@ -3,37 +3,56 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>中日即時翻譯助手</title>
+    <title>台日旅遊即時翻譯助手</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        .active-pulse { animation: pulse 1.5s infinite; }
-        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
+        /* 增加一點點擊回饋感 */
+        .btn-active:active { transform: scale(0.95); }
+        .recording { animation: pulse 1.5s infinite; background-color: #ef4444 !important; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; } }
     </style>
 </head>
-<body class="bg-gray-100 min-h-screen flex flex-col items-center p-4">
-    <header class="text-center my-8">
-        <h1 class="text-2xl font-bold text-gray-800">🇯🇵 中日即時翻譯 🇨🇳</h1>
-        <p class="text-gray-500">點擊按鈕後開始說話</p>
+<body class="bg-slate-50 min-h-screen flex flex-col items-center p-6 font-sans">
+    
+    <header class="text-center my-6">
+        <div class="text-5xl mb-2">🇹🇼 ⇄ 🇯🇵</div>
+        <h1 class="text-2xl font-extrabold text-slate-800 tracking-tight">台日即時翻譯助手</h1>
+        <p class="text-slate-500 text-sm mt-1">您的旅遊隨身翻譯官</p>
     </header>
 
-    <div class="w-full max-w-md space-y-6">
-        <button id="btn-zh" class="w-full bg-blue-500 hover:bg-blue-600 text-white py-8 rounded-2xl shadow-lg flex flex-col items-center transition-all">
-            <span class="text-lg">我說中文 (翻日文)</span>
-            <span class="text-sm opacity-80 mt-2">点击说话</span>
-        </button>
-
-        <button id="btn-ja" class="w-full bg-red-500 hover:bg-red-600 text-white py-8 rounded-2xl shadow-lg flex flex-col items-center transition-all">
-            <span class="text-lg">對方說日文 (翻中文)</span>
-            <span class="text-sm opacity-80 mt-2">日本語で話す</span>
-        </button>
-
-        <div class="bg-white p-6 rounded-2xl shadow-inner min-h-[150px] border border-gray-200">
-            <p id="status" class="text-xs text-gray-400 mb-2 italic">等待操作...</p>
-            <div id="result-box">
-                <p id="original-text" class="text-gray-600 text-sm mb-2"></p>
-                <p id="translated-text" class="text-xl font-bold text-gray-900"></p>
+    <div class="w-full max-w-md space-y-5">
+        <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 min-h-[180px] flex flex-col justify-between">
+            <div>
+                <p id="status" class="text-xs font-bold uppercase tracking-wider text-blue-500 mb-2">等待指令</p>
+                <p id="original-text" class="text-slate-400 text-sm italic min-h-[1.5rem] mb-2"></p>
+                <p id="translated-text" class="text-2xl font-semibold text-slate-900 leading-tight"></p>
+            </div>
+            <div class="mt-4 pt-4 border-t border-slate-100 flex justify-end">
+                <span class="text-[10px] text-slate-300">Powered by Web Speech API</span>
             </div>
         </div>
+
+        <div class="grid grid-cols-1 gap-4">
+            <button id="btn-zh" class="btn-active group relative overflow-hidden bg-blue-600 text-white p-6 rounded-2xl shadow-md transition-all flex items-center justify-between">
+                <div class="flex flex-col items-start">
+                    <span class="text-xs opacity-80 font-medium">我說中文</span>
+                    <span class="text-xl font-bold">翻成日文</span>
+                </div>
+                <div class="text-3xl group-hover:rotate-12 transition-transform">🗣️</div>
+            </button>
+
+            <button id="btn-ja" class="btn-active group relative overflow-hidden bg-white text-slate-800 border-2 border-slate-200 p-6 rounded-2xl shadow-sm transition-all flex items-center justify-between">
+                <div class="flex flex-col items-start">
+                    <span class="text-xs text-slate-500 font-medium">對方說日文</span>
+                    <span class="text-xl font-bold text-red-500">翻成中文</span>
+                </div>
+                <div class="text-3xl group-hover:rotate-12 transition-transform">🇯🇵</div>
+            </button>
+        </div>
+
+        <p class="text-center text-xs text-slate-400 px-4">
+            提示：點擊按鈕後請開始說話，系統會自動偵測結束並播放翻譯語音。
+        </p>
     </div>
 
     <script>
@@ -43,39 +62,76 @@
         const originalText = document.getElementById('original-text');
         const translatedText = document.getElementById('translated-text');
 
-        const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+        // 初始化語音辨識
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) {
+            alert("很抱歉，您的瀏覽器不支援語音辨識功能。請換用 Chrome 或 Safari。");
+        }
+        const recognition = new SpeechRecognition();
         recognition.interimResults = false;
+        recognition.continuous = false;
 
         async function translateAndSpeak(text, sourceLang, targetLang) {
-            status.innerText = "翻譯中...";
-            // 使用免費的 Google 翻譯 API 代理 (注意：此為示範用途)
-            const res = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=${sourceLang}&tl=${targetLang}&dt=t&q=${encodeURI(text)}`);
-            const data = await res.json();
-            const result = data[0][0][0];
-            
-            translatedText.innerText = result;
-            
-            // 語音播放
-            const utterance = new SpeechSynthesisUtterance(result);
-            utterance.lang = targetLang === 'ja' ? 'ja-JP' : 'zh-TW';
-            window.speechSynthesis.speak(utterance);
-            status.innerText = "完成";
+            status.innerText = "正在翻譯中...";
+            try {
+                // 使用 Google 翻譯 API 代理（繁體中文版本）
+                const res = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=${sourceLang}&tl=${targetLang}&dt=t&q=${encodeURI(text)}`);
+                const data = await res.json();
+                const result = data[0][0][0];
+                
+                translatedText.innerText = result;
+                
+                // 語音播放設定
+                const utterance = new SpeechSynthesisUtterance(result);
+                // 設定對應語系
+                if (targetLang === 'ja') {
+                    utterance.lang = 'ja-JP';
+                } else {
+                    utterance.lang = 'zh-TW';
+                }
+                window.speechSynthesis.speak(utterance);
+                status.innerText = "翻譯完畢";
+            } catch (error) {
+                status.innerText = "翻譯發生錯誤";
+                console.error(error);
+            }
         }
 
-        function startListening(lang, source, target) {
-            recognition.lang = lang;
-            recognition.start();
-            status.innerText = "正在聆聽...";
-            
-            recognition.onresult = (event) => {
-                const text = event.results[0][0].transcript;
-                originalText.innerText = `辨識內容：${text}`;
-                translateAndSpeak(text, source, target);
-            };
+        function startListening(lang, source, target, activeBtn) {
+            // 避免重複點擊
+            if (status.innerText === "正在聆聽...") return;
+
+            try {
+                recognition.lang = lang;
+                recognition.start();
+                
+                status.innerText = "正在聆聽...";
+                activeBtn.classList.add('recording');
+                
+                recognition.onresult = (event) => {
+                    const text = event.results[0][0].transcript;
+                    originalText.innerText = `辨識結果：${text}`;
+                    translateAndSpeak(text, source, target);
+                };
+
+                recognition.onend = () => {
+                    activeBtn.classList.remove('recording');
+                    if (status.innerText === "正在聆聽...") {
+                        status.innerText = "結束聆聽";
+                    }
+                };
+
+                recognition.onerror = (event) => {
+                    status.innerText = "辨識失敗：" + event.error;
+                    activeBtn.classList.remove('recording');
+                };
+            } catch (e) {
+                console.log("Recognition error:", e);
+            }
         }
 
-        btnZh.onclick = () => startListening('zh-TW', 'zh-TW', 'ja');
-        btnJa.onclick = () => startListening('ja-JP', 'ja', 'zh-TW');
+        btnZh.onclick = () => startListening('zh-TW', 'zh-TW', 'ja', btnZh);
+        btnJa.onclick = () => startListening('ja-JP', 'ja', 'zh-TW', btnJa);
     </script>
 </body>
 </html>
